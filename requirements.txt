@@ -1,0 +1,3 @@
+PyQt5~=5.15.9
+ping3~=4.0.4
+PyQt-Fluent-Widgets==1.2.2
