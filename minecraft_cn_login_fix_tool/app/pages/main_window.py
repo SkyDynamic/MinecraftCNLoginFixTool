@@ -23,17 +23,15 @@ class UpdateThread(QThread):
     fillTableSignal = pyqtSignal(list)
     stateTooltipSignal = pyqtSignal(str, str, bool)
     
-    def __init__(self, parent: ScrollArea = None, api_url: str = None) -> None:
+    def __init__(self, parent: ScrollArea = None) -> None:
         super().__init__(parent)
-        self.api_url = api_url
     
     def run(self) -> None:
         self.stateTooltipSignal.emit("正在测试各个IP延迟中...",
                                      "这需要一些时间, 请耐心等待!", True)
         new_data = []
         for data in server_data:
-            ip = list(data.keys())[0]
-            response = ping(ip, size=1024, timeout=1)
+            response = ping(data.get("ip"), size=1024, timeout=1)
             if not response:
                 response = -1
             else:
@@ -96,7 +94,7 @@ class MainPage(ScrollArea):
             return
         data = server_data[self.tableFrame.table.currentRow()]
         for domain in DOMAIN:
-            hosts_list.append(list(data.keys())[0] + " " + domain + " #MCLFT_\n")
+            hosts_list.append(data.get("ip") + " " + domain + " #MCLFT_\n")
         try:
             with open("C:/Windows/System32/drivers/etc/hosts", "r", encoding="utf8") as hosts_file:
                 origin_hosts_lines = hosts_file.readlines()
@@ -107,9 +105,9 @@ class MainPage(ScrollArea):
                         continue
                     new_hosts_list.append(line)
                 hosts_file.write("".join(new_hosts_list + hosts_list))
-                os.system("ipconfig /flushdns")
+                os.popen("ipconfig /flushdns")
         except Exception as e:
-            QMessageBox.critical(self, "错误", str(e), QMessageBox.Yes)
+            QMessageBox.critical(self, "错误", str(e.__class__), QMessageBox.Yes)
         QMessageBox.information(self, '警告', '修改Hosts完成！', QMessageBox.Yes)
     
     def __on_delete_button_clicked(self):
@@ -124,7 +122,7 @@ class MainPage(ScrollArea):
                         continue
                     new_hosts_list.append(line)
                 hosts_file.write("".join(new_hosts_list))
-                os.system("ipconfig /flushdns")
+                os.popen("ipconfig /flushdns")
         except Exception as e:
             QMessageBox.critical(self, "错误", str(e), QMessageBox.Yes)
         QMessageBox.information(self, '警告', '本软件修改的Hosts删除完毕！', QMessageBox.Yes)
@@ -152,25 +150,23 @@ class MainPage(ScrollArea):
             for key in IP.keys():
                 IP_LIST = IP.get(key)
                 for ip in IP_LIST:
-                    processed_data.append({ip: key, "ping": None})
+                    processed_data.append({"ip": ip, "country": key, "ping": None})
             self.tableFrame.table.setRowCount(len(processed_data))
             for i, data in enumerate(processed_data):
-                ip = list(data.keys())[0]
-                ip_item = QTableWidgetItem(ip)
+                ip_item = QTableWidgetItem(data.get("ip"))
                 ip_item.setTextAlignment(Qt.AlignCenter)
-                country_item = QTableWidgetItem(data.get(ip))
+                country_item = QTableWidgetItem(data.get("country"))
                 country_item.setTextAlignment(Qt.AlignCenter)
                 self.tableFrame.table.setItem(i, 0, ip_item)
                 self.tableFrame.table.setItem(i, 1, country_item)
             server_data = processed_data
         else:
-            for i, data in enumerate(data):
-                ip = list(data.keys())[0]
-                ip_item = QTableWidgetItem(ip)
+            for i, data_ in enumerate(data):
+                ip_item = QTableWidgetItem(data_.get("ip"))
                 ip_item.setTextAlignment(Qt.AlignCenter)
-                country_item = QTableWidgetItem(data.get(ip))
+                country_item = QTableWidgetItem(data_.get("country"))
                 country_item.setTextAlignment(Qt.AlignCenter)
-                ping_item = QTableWidgetItem(str(data.get("ping")) if str(data.get("ping")) != "-1" else "连接超时")
+                ping_item = QTableWidgetItem(str(data_.get("ping")) if str(data_.get("ping")) != "-1" else "连接超时")
                 ping_item.setTextAlignment(Qt.AlignCenter)
                 self.tableFrame.table.setItem(i, 0, ip_item)
                 self.tableFrame.table.setItem(i, 1, country_item)
