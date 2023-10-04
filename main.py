@@ -1,7 +1,7 @@
 import sys
 import ctypes
 
-from minecraft_cn_login_fix_tool.app.pages.main_window import MainPage
+from minecraft_cn_login_fix_tool.app.main_window import MainWindow
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMessageBox, QWidget
@@ -17,7 +17,7 @@ def main():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     app = QApplication(sys.argv)
     app.font().families().append("Microsoft YaHei UI")
-    main_app = MainPage()
+    main_app = MainWindow()
     main_app.show()
     app.exec_()
 

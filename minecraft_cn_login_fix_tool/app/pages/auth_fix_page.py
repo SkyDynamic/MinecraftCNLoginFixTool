@@ -1,7 +1,6 @@
 import os
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QThreadPool, QRunnable, QObject, pyqtSlot
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QSizePolicy, QHeaderView, QAbstractItemView, QFrame, QTableWidgetItem, QMessageBox
 from qfluentwidgets import ScrollArea, PushButton, FluentIcon, TableWidget, StateToolTip
 
@@ -45,14 +44,13 @@ class UpdateThread(QThread):
         self.updateButtonSignal.emit(True)
 
 
-class MainPage(ScrollArea):
+class AuthPage(ScrollArea):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.installer_list = []
         self.loader_list = []
         
-        self.setWindowIcon(QIcon("resources/icon.ico"))
-        self.setWindowTitle("MinecraftCNLoginFixTool")
+        self.setObjectName("auth_fix_page")
         
         self.vBoxLayout = QVBoxLayout(self)
         
@@ -93,7 +91,7 @@ class MainPage(ScrollArea):
         if self.tableFrame.table.currentRow() == -1:
             return
         data = server_data[self.tableFrame.table.currentRow()]
-        for domain in DOMAIN:
+        for domain in AUTHSERVER_DOMAIN:
             hosts_list.append(data.get("ip") + " " + domain + " #MCLFT_\n")
         try:
             with open("C:/Windows/System32/drivers/etc/hosts", "r", encoding="utf8") as hosts_file:
@@ -101,7 +99,7 @@ class MainPage(ScrollArea):
             
             with open("C:/Windows/System32/drivers/etc/hosts", "w", encoding="utf8") as hosts_file:
                 for line in origin_hosts_lines:
-                    if re.search('#MCLFT_', line):
+                    if re.search('#MCLFT_', line) and line.split()[1] in AUTHSERVER_DOMAIN:
                         continue
                     new_hosts_list.append(line)
                 hosts_file.write("".join(new_hosts_list + hosts_list))
@@ -126,7 +124,7 @@ class MainPage(ScrollArea):
         except Exception as e:
             QMessageBox.critical(self, "错误", str(e), QMessageBox.Yes)
         QMessageBox.information(self, '警告', '本软件修改的Hosts删除完毕！', QMessageBox.Yes)
-        
+    
     def __update_data_updateButton_signalReceive(self, status):
         self.update_button.setEnabled(status)
     
@@ -147,8 +145,8 @@ class MainPage(ScrollArea):
         global server_data
         if not data:
             processed_data = []
-            for key in IP.keys():
-                IP_LIST = IP.get(key)
+            for key in AUTHSERVER_IP.keys():
+                IP_LIST = AUTHSERVER_IP.get(key)
                 for ip in IP_LIST:
                     processed_data.append({"ip": ip, "country": key, "ping": None})
             self.tableFrame.table.setRowCount(len(processed_data))

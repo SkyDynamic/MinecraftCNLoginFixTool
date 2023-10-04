@@ -1,4 +1,5 @@
-# 一个基于修改Hosts让登录MC不再困难的软件
+# Minecraft CN Login Fix Tool 
+- 一个基于修改Hosts让登录MC不再困难的软件
 
 ## 怎么用？
 进入软件后，你有两个选择  
