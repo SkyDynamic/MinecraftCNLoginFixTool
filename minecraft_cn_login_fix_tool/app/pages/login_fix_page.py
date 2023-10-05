@@ -1,7 +1,6 @@
 import os
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRunnable, QObject, QThreadPool
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QSizePolicy, QHeaderView, QAbstractItemView, QFrame, QTableWidgetItem, QMessageBox
 from qfluentwidgets import ScrollArea, PushButton, FluentIcon, TableWidget, StateToolTip
 
@@ -18,10 +17,66 @@ def takePing(elem):
     return elem["ping"]
 
 
+class Signal:
+    def __init__(self, u, f, s, a, so):
+        self.updateButtonSignal = u
+        self.fillTableSignal = f
+        self.stateTooltipSignal = s
+        self.appendNewDataSignal = a
+        self.sortNewDataSignal = so
+
+
+class PingThread(QRunnable):
+    
+    def __init__(self):
+        super().__init__()
+        self.data = None
+        self.signs: Signal = None
+    
+    def run(self):
+        response = ping(self.data.get("ip"), size=1024, timeout=1)
+        if not response:
+            response = 999999
+        else:
+            response = int(response * 1000)
+        self.data["ping"] = response
+        self.signs.appendNewDataSignal.emit(self.data)
+    
+    def transfer(self, signal: Signal, data):
+        self.signs = signal
+        self.data = data
+
+
+class Tasks(QObject):
+    def __init__(self, signal):
+        super(Tasks, self).__init__()
+        self.signal = signal
+        
+        self.pool = QThreadPool()
+        self.pool.globalInstance()
+    
+    def start(self):
+        self.pool.setMaxThreadCount(len(server_data) + 1)
+        for data in server_data:
+            task_thread = PingThread()
+            task_thread.transfer(self.signal, data)
+            task_thread.setAutoDelete(True)
+            self.pool.start(task_thread)
+        
+        self.pool.waitForDone()
+        
+        self.signal.sortNewDataSignal.emit()
+        self.signal.stateTooltipSignal.emit(self.tr("TCPing完成！"), "", False)
+        self.signal.fillTableSignal.emit()
+        self.signal.updateButtonSignal.emit(True)
+
+
 class UpdateThread(QThread):
     updateButtonSignal = pyqtSignal(bool)
-    fillTableSignal = pyqtSignal(list)
+    fillTableSignal = pyqtSignal()
     stateTooltipSignal = pyqtSignal(str, str, bool)
+    appendNewDataSignal = pyqtSignal(dict)
+    sortNewDataSignal = pyqtSignal()
     
     def __init__(self, parent: ScrollArea = None) -> None:
         super().__init__(parent)
@@ -29,20 +84,14 @@ class UpdateThread(QThread):
     def run(self) -> None:
         self.stateTooltipSignal.emit("正在测试各个IP延迟中...",
                                      "这需要一些时间, 请耐心等待!", True)
-        new_data = []
-        for data in server_data:
-            response = ping(data.get("ip"), size=1024, timeout=1)
-            if not response:
-                response = -1
-            else:
-                response = int(response * 1000)
-            data["ping"] = response
-            new_data.append(data)
-        new_data.sort(key=takePing)
-        
-        self.stateTooltipSignal.emit(self.tr("TCPing完成！"), "", False)
-        self.fillTableSignal.emit(new_data)
-        self.updateButtonSignal.emit(True)
+        task = Tasks(Signal(
+            self.updateButtonSignal,
+            self.fillTableSignal,
+            self.stateTooltipSignal,
+            self.appendNewDataSignal,
+            self.sortNewDataSignal
+        ))
+        task.start()
 
 
 class LoginPage(ScrollArea):
@@ -50,6 +99,7 @@ class LoginPage(ScrollArea):
         super().__init__(parent)
         self.installer_list = []
         self.loader_list = []
+        self.new_data = []
         
         self.setObjectName("login_fix_page")
         
@@ -84,6 +134,8 @@ class LoginPage(ScrollArea):
         update_thread.updateButtonSignal.connect(self.__update_data_updateButton_signalReceive)
         update_thread.stateTooltipSignal.connect(self.__update_data_stateTooltip_signalReceive)
         update_thread.fillTableSignal.connect(self.__update_data_fillTable_signalReceive)
+        update_thread.appendNewDataSignal.connect(self.__append_new_data)
+        update_thread.sortNewDataSignal.connect(self.__sort_new_data_signalReceive)
         update_thread.start()
     
     def __on_confirm_button_clicked(self):
@@ -139,8 +191,14 @@ class LoginPage(ScrollArea):
             self.stateTooltip.setState(True)
             self.stateTooltip = None
     
-    def __update_data_fillTable_signalReceive(self, data):
-        self.__fill_table(data)
+    def __sort_new_data_signalReceive(self):
+        self.new_data.sort(key=takePing)
+    
+    def __update_data_fillTable_signalReceive(self):
+        self.__fill_table(self.new_data)
+    
+    def __append_new_data(self, data):
+        self.new_data.append(data)
     
     def __fill_table(self, data=None):
         global server_data
@@ -165,7 +223,7 @@ class LoginPage(ScrollArea):
                 ip_item.setTextAlignment(Qt.AlignCenter)
                 country_item = QTableWidgetItem(data_.get("country"))
                 country_item.setTextAlignment(Qt.AlignCenter)
-                ping_item = QTableWidgetItem(str(data_.get("ping")) if str(data_.get("ping")) != "-1" else "连接超时")
+                ping_item = QTableWidgetItem(str(data_.get("ping")) if str(data_.get("ping")) != "999999" else "连接超时")
                 ping_item.setTextAlignment(Qt.AlignCenter)
                 self.tableFrame.table.setItem(i, 0, ip_item)
                 self.tableFrame.table.setItem(i, 1, country_item)

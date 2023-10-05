@@ -23,10 +23,10 @@ def main():
 
 
 if __name__ == '__main__':
-    if int(is_admin()) == 1:
+    #if int(is_admin()) == 1:
         sys.exit(main())
-    else:
-        app = QApplication(sys.argv)
-        w = QWidget()
-        error_window = QMessageBox.critical(w, "警告", "请使用管理员身份运行！", QMessageBox.Yes)
+    #else:
+    #    app = QApplication(sys.argv)
+    #    w = QWidget()
+    #    error_window = QMessageBox.critical(w, "警告", "请使用管理员身份运行！", QMessageBox.Yes)
 
